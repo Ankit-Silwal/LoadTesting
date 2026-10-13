@@ -1,0 +1,17 @@
+{
+  "name": "@ankit-silwal/loadtesting",
+  "version": "0.1.0",
+  "description": "Local HTTP load testing with a CLI, web workspace, and per-request logs",
+  "type": "module",
+  "bin": { "loadtesting": "dist/index.js" },
+  "exports": { ".": "./dist/core/index.js" },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "scripts": { "prepack": "node ../../scripts/build.mjs" },
+  "repository": { "type": "git", "url": "git+https://github.com/Ankit-Silwal/LoadTesting.git", "directory": "packages/cli" },
+  "homepage": "https://github.com/Ankit-Silwal/LoadTesting#readme",
+  "bugs": "https://github.com/Ankit-Silwal/LoadTesting/issues",
+  "keywords": ["load-testing", "benchmark", "http", "cli", "postman", "latency"],
+  "license": "AGPL-3.0-only",
+  "publishConfig": { "access": "public" }
+}

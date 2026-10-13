@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LoadTesting · Local workspace</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" type="module"></script></head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="/"><span class="brandmark">≋</span> LoadTesting<span class="beta">0.1</span></a>
+  <div class="workspace-label"><span class="live-dot"></span> LOCAL WORKSPACE</div>
+  <div class="side-heading">COLLECTION <button id="add-endpoint" class="icon-button" title="Add endpoint" aria-label="Add endpoint">+</button></div>
+  <nav id="endpoint-list" aria-label="Endpoints"></nav>
+  <button id="add-request" class="quiet-button">＋ Add request</button>
+  <div class="side-divider"></div>
+  <div class="side-heading">WORKSPACE</div>
+  <button class="side-action" id="import-config">↥ Import config / Postman</button>
+  <button class="side-action" id="export-config">↧ Export configuration</button>
+  <button class="side-action" id="load-demo">◈ Load demo collection</button>
+  <div class="side-heading history-heading">RECENT RUNS</div><div id="history" class="history"><p>No runs yet</p></div>
+  <div class="side-bottom"><span class="local-icon">⌘</span><div>Runs on your machine<small>Logs saved locally · no account</small></div></div>
+</aside>
+<main>
+  <header class="topbar"><div class="breadcrumbs">Workspace <span>/</span> <strong>Load test</strong></div><div class="local-badge"><span class="live-dot"></span> Local engine</div></header>
+  <section class="page">
+    <div class="page-heading"><div><div class="eyebrow">HTTP PERFORMANCE WORKSPACE</div><h1>Small requests. Big insights.</h1><p>Build your collection, dial up the users, and see how your API holds up.</p></div><button id="run" class="primary-button"><span>▶</span> Run load test</button><button id="stop" class="stop-button" hidden>■ Stop run</button></div>
+    <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+    <div class="workspace-grid">
+      <section class="editor card">
+        <div class="card-heading"><div><span class="section-icon">↗</span> Request builder</div><span id="request-count" class="muted">3 endpoints</span></div>
+        <div class="request-name-row"><input id="request-name" aria-label="Request name" placeholder="Request name"><button id="duplicate-request" class="text-button">Duplicate</button><button id="delete-request" class="text-button danger">Remove</button></div>
+        <div class="url-bar"><select id="method" aria-label="HTTP method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option></select><input id="url" aria-label="Endpoint URL" placeholder="https://api.example.com/v1/users"><button id="preview" title="Send a single request" class="send-button">Send ↗</button></div>
+        <div class="tabs" role="tablist"><button class="tab active" data-tab="headers" role="tab">Headers</button><button class="tab" data-tab="query" role="tab">Params</button><button class="tab" data-tab="auth" role="tab">Auth</button><button class="tab" data-tab="body" role="tab">Body</button><button class="tab" data-tab="assertions" role="tab">Assertions</button><button class="tab" data-tab="variables" role="tab">Variables</button></div>
+        <div id="tab-content" class="tab-content" role="tabpanel"></div>
+        <div class="editor-footer"><span>↳ All collection endpoints participate in the run</span><span id="editor-status">Ready</span></div>
+      </section>
+      <section class="settings card">
+        <div class="card-heading"><div><span class="section-icon">☷</span> Test configuration</div></div>
+        <div class="settings-body">
+          <label class="field-label" for="users">Concurrent users <span class="help-pill">VU</span></label><div class="number-control"><button id="users-minus" aria-label="Decrease users">−</button><input id="users" type="number" value="10" min="1" max="10000"><button id="users-plus" aria-label="Increase users">+</button></div><p class="field-help">Shared across the entire collection.</p>
+          <div class="field-row"><label>Run mode<select id="mode"><option value="duration">Duration</option><option value="requests">Request count</option></select></label><label><span id="budget-label">Seconds</span><input id="budget" type="number" min="1" value="10"></label></div>
+          <div class="field-row"><label>Timeout <span class="unit">ms</span><input id="timeout" type="number" min="1" value="10000"></label><label>Ramp up <span class="unit">sec</span><input id="rampUp" type="number" min="0" value="0"></label></div>
+          <details><summary>Advanced controls <span>＋</span></summary><div class="field-row"><label>Think time <span class="unit">ms</span><input id="thinkTime" type="number" min="0" value="0"></label><label>Max RPS<input id="maxRps" type="number" min="0" value="0"></label></div><p class="field-help">Max RPS of 0 means unlimited.</p><div class="field-row"><label>P95 limit <span class="unit">ms</span><input id="p95" type="number" min="0" placeholder="Optional"></label><label>Error limit <span class="unit">%</span><input id="errorRate" type="number" min="0" max="100" placeholder="Optional"></label></div></details>
+          <div class="log-note"><span>▤</span><p><strong>Two logs. Every run.</strong><br>Individual requests + a complete summary, saved in your working directory.</p></div>
+        </div>
+      </section>
+    </div>
+    <section class="results">
+      <div class="results-heading"><h2>Run overview <span id="run-state" class="state-pill">Ready to run</span></h2><div class="result-actions"><a id="download-details" hidden>↧ Request log</a><a id="download-summary" hidden>↧ Summary</a><button id="clear-results" class="text-button">Clear view</button></div></div>
+      <div class="metrics-grid">
+        <div class="metric"><span>Total requests</span><strong id="metric-total">—</strong><small id="metric-elapsed">Waiting for your first run</small></div>
+        <div class="metric"><span>Successful</span><strong class="green" id="metric-success">—</strong><small id="metric-error">Errors appear here</small></div>
+        <div class="metric"><span>Throughput</span><strong id="metric-rps">—</strong><small>requests per second</small></div>
+        <div class="metric"><span>P95 latency</span><strong id="metric-p95">—</strong><small>95% of attempts complete below this</small></div>
+      </div>
+      <div class="results-grid">
+        <div class="card chart-card"><div class="card-heading"><div>Latency over time</div><span class="chart-key"><i></i> P95 latency · ms</span></div><div class="chart-wrap"><svg id="chart" viewBox="0 0 760 160" role="img" aria-label="P95 latency over time"></svg><div class="chart-empty" id="chart-empty"><span>⌁</span>Your API's story starts with a run.<small>Live latency appears here as requests complete.</small></div></div></div>
+        <div class="card latency-card"><div class="card-heading"><div>Latency distribution</div><span class="muted">ms</span></div><div id="latency-bars" class="latency-bars"></div></div>
+      </div>
+      <section class="card endpoint-results"><div class="card-heading"><div>Endpoint breakdown</div><span class="muted">Success, failures & latency</span></div><div class="table-scroll"><table><thead><tr><th>Endpoint</th><th>Requests</th><th>Success</th><th>Failed</th><th>RPS</th><th>P50</th><th>P95</th><th>P99</th></tr></thead><tbody id="endpoint-results"><tr><td colspan="8" class="empty-cell">Start a run to compare your endpoints.</td></tr></tbody></table></div></section>
+      <details class="card request-log"><summary>Latest requests <span class="muted">Last 200 · full details in the log file</span></summary><div class="table-scroll"><table><thead><tr><th>#</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Result</th></tr></thead><tbody id="recent-requests"></tbody></table></div></details>
+      <div class="footer"><span>LoadTesting / <span id="footer-log">Logs: ./loadtesting-logs/</span></span><span>HTTP & HTTPS · Local execution · Node.js</span></div>
+    </section>
+  </section>
+</main>
+<input id="import-file" type="file" accept=".json,application/json" hidden>
+</body></html>
