@@ -1,0 +1,1 @@
+* text=auto\n*.js text eol=lf\n*.mjs text eol=lf\n*.json text eol=lf\n*.yml text eol=lf\n*.md text eol=lf\n

@@ -98,7 +98,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
     onRequest?.(result);
   }
   async function worker(index) {
-    await pause(config.rampUp * 1000 * index / config.users);
+    await pause(Math.min(config.rampUp * 1000 * index / config.users, Math.max(0, deadline - performance.now())));
     while (!controller.signal.aborted && performance.now() < deadline) {
       if (config.requests !== null && nextRequest >= config.requests) return;
       if (config.maxRps) {

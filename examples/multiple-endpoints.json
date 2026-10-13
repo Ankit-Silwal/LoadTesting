@@ -1,0 +1,49 @@
+{
+  "name": "Demo API performance",
+  "users": 10,
+  "duration": 10,
+  "timeout": 5000,
+  "rampUp": 1,
+  "maxRps": 100,
+  "variables": {
+    "baseUrl": "http://127.0.0.1:4000"
+  },
+  "endpoints": [
+    {
+      "id": "health",
+      "name": "Health",
+      "url": "{{baseUrl}}/health",
+      "method": "GET",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "assertions": {
+        "json": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "id": "create",
+      "name": "Create payload",
+      "url": "{{baseUrl}}/echo",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+        "message": "Hello"
+      },
+      "expectedStatus": [
+        200
+      ]
+    },
+    {
+      "id": "slow",
+      "name": "Slow response",
+      "url": "{{baseUrl}}/slow"
+    }
+  ],
+  "thresholds": {
+    "errorRate": 1,
+    "p95": 500
+  }
+}

@@ -4,6 +4,6 @@ dist/
 loadtesting-logs/
 .env
 .env.*
-! .env.example
+!.env.example
 test-results/
 playwright-report/
