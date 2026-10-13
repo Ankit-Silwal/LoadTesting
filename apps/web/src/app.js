@@ -134,7 +134,7 @@ function renderChart() {
   const points = chart.map(p => [40+(p.x-chart[0].x)/span*705, 135-p.y/max*115]);
   const line = points.map(([x,y],i) => `${i ? 'L' : 'M'} ${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const grid = [0,.5,1].map(f => `<line x1="40" x2="745" y1="${135-f*115}" y2="${135-f*115}" stroke="#edf1e9" stroke-dasharray="4 5"/><text x="0" y="${138-f*115}" fill="#a3af98" font-size="9">${fmt(max*f)}</text>`).join('');
-  $('chart').innerHTML = `${grid}<path d="${line} L ${points.at(-1)[0]},135 L 40,135 Z" fill="#2d946a" opacity=".055"/><path d="${line}" fill="none" stroke="#499c76" stroke-width="2"/><text x="40" y="158" fill="#a3af98" font-size="9">${fmt(chart[0].x)}s</text><text x="745" y="158" fill="#a3af98" font-size="9" text-anchor="end">${fmt(chart.at(-1).x)}s</text>`;
+  $('chart').innerHTML = `${grid}<path d="${line} L ${points.at(-1)[0]},135 L 40,135 Z" fill="#2d946a" opacity=".055"/><path d="${line}" fill="none" stroke="#499c76" stroke-width="2"/><circle cx="${points.at(-1)[0]}" cy="${points.at(-1)[1]}" r="3" fill="#499c76"/><text x="40" y="158" fill="#a3af98" font-size="9">${fmt(chart[0].x)}s</text><text x="745" y="158" fill="#a3af98" font-size="9" text-anchor="end">${fmt(chart.at(-1).x)}s</text>`;
 }
 function showRun(run) {
   const s = run.stats;

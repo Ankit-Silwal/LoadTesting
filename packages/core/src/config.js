@@ -3,7 +3,7 @@
 const methods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 export function interpolate(value, variables = {}, stack = []) {
   if (typeof value === 'string') return value.replace(/\{\{([^{}]+)\}\}/g, (_, key) => {
-    if (variables[key.trim()] === undefined) throw new Error(`Missing variable: ${key.trim()}`);
+    if (!Object.hasOwn(variables, key.trim()) || variables[key.trim()] === undefined) throw new Error(`Missing variable: ${key.trim()}`);
     const name = key.trim();
     if (stack.includes(name) || stack.length > 32) throw new Error('Circular variable: ' + name);
     return interpolate(String(variables[name]), variables, [...stack, name]);
@@ -50,7 +50,6 @@ export function normalizeConfig(input, environment = process.env) {
     const id = String(e.id ?? `endpoint-${i+1}`);
     if (ids.has(id)) throw new Error(`Duplicate endpoint id: ${id}`);
     ids.add(id);
-    if (!e || typeof e !== 'object' || Array.isArray(e)) throw new Error('Each endpoint must be an object');
     let url;
     try { url = new URL(e.url); } catch { throw new Error(`Endpoint ${i+1}: provide a full HTTP URL`); }
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only HTTP and HTTPS endpoints are supported');
@@ -66,7 +65,7 @@ export function normalizeConfig(input, environment = process.env) {
     else if (auth.type === 'apiKey') {
       if (!auth.key) throw new Error('API key auth requires a key name');
       if (auth.in === 'query') url.searchParams.set(auth.key, String(auth.value ?? ''));
-      else headers[auth.key] = String(auth.value ?? '');
+      else headers[String(auth.key).toLowerCase()] = String(auth.value ?? '');
     } else if (auth.type !== 'none') throw new Error('Auth supports none, bearer, basic, or apiKey');
     let body = e.body;
     const bodyType = e.bodyType ?? (typeof body === 'object' ? 'json' : 'raw');
@@ -124,8 +123,12 @@ export function importPostman(collection, environment = {}) {
       const body = r.body ?? {};
       const pairs = values => Object.fromEntries((values ?? []).filter(v => !v.disabled).map(v => [v.key, v.value ?? '']));
       if (body.mode === 'file' || (body.formdata ?? []).some(v => v.type === 'file')) throw new Error('Postman file uploads require adding the file manually after import');
+      const rawUrl = typeof r.url === 'string' ? r.url : r.url?.raw;
+      const hasQuery = typeof r.url === 'object' && Array.isArray(r.url.query);
+      const requestUrl = hasQuery ? rawUrl?.split('?')[0] : rawUrl;
       endpoints.push({
-        name: item.name, method: r.method ?? 'GET', url: typeof r.url === 'string' ? r.url : r.url?.raw,
+        name: item.name, method: r.method ?? 'GET', url: requestUrl,
+        ...(hasQuery ? { query: pairs(r.url.query) } : {}),
         headers: pairs(r.header), auth: authValue(r.auth ?? auth),
         bodyType: body.mode === 'raw' ? (body.options?.raw?.language === 'json' ? 'json' : 'raw') : body.mode === 'urlencoded' ? 'urlencoded' : body.mode === 'formdata' ? 'multipart' : 'none',
         body: body.mode === 'raw' ? body.raw : body.mode === 'urlencoded' ? pairs(body.urlencoded) : body.mode === 'formdata' ? pairs(body.formdata) : undefined,

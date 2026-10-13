@@ -118,3 +118,33 @@ test('Postman nested folders inherit auth and preserve active headers and variab
   assert.equal(config.endpoints.length,1); assert.equal(config.endpoints[0].headers.authorization,'Bearer demo');
   assert.equal(config.endpoints[0].body,'{"ok":true}'); assert.equal(config.endpoints[0].headers.ignore,undefined);
 });
+test('small finite budgets do not wait for unused users, rate slots, ramp-up or think-time', async t => {
+  const f = await fixture(t);
+  for (const settings of [
+    { users:50, requests:1, maxRps:1 },
+    { users:10, requests:2, rampUp:60 },
+    { users:2, requests:2, thinkTime:30000 },
+    { users:20, requests:3, maxRps:20 },
+  ]) {
+    const s = await runLoadTest({ ...settings, endpoints:[{url:f.base+'/ok'}] },{outputDir:f.outputDir});
+    assert.equal(s.total,settings.requests); assert.ok(s.elapsedSeconds < 1, 'Unused pacing extended a completed budget');
+  }
+});
+test('nested variables resolve, cycles/missing inherited names reject, auth overrides casing', () => {
+  const c=normalizeConfig({ variables:{ base:'{{host}}', token:'{{secret}}' }, endpoints:[{url:'{{base}}/ok',headers:{Authorization:'old'},auth:{type:'bearer',token:'{{token}}'}}] },{host:'http://localhost',secret:'new'});
+  assert.equal(c.endpoints[0].headers.authorization,'Bearer new');assert.equal(c.endpoints[0].url,'http://localhost/ok');
+  assert.throws(()=>normalizeConfig({variables:{a:'{{b}}',b:'{{a}}'},endpoints:[{url:'{{a}}'}]}),/Circular variable/);
+  assert.throws(()=>normalizeConfig({endpoints:[{url:'{{constructor}}'}]},{}),/Missing variable/);
+  assert.throws(()=>normalizeConfig({endpoints:[null]}),/Each endpoint/);
+});
+test('Postman active query parameters resolve variables and disabled params stay excluded', () => {
+  const imported=importPostman({variable:[{key:'base',value:'http://localhost'},{key:'id',value:'42'}],item:[{name:'Lookup',request:{url:{raw:'{{base}}/lookup?id={{id}}&disabled=bad',query:[{key:'id',value:'{{id}}'},{key:'disabled',value:'bad',disabled:true}]}}}]});
+  assert.equal(normalizeConfig(imported).endpoints[0].url,'http://localhost/lookup?id=42');
+});
+test('response previews are available to callbacks but excluded from disk logs', async t => {
+  const f=await fixture(t);let preview;
+  const s=await runLoadTest({users:1,requests:1,endpoints:[{url:f.base+'/ok'}]}, {outputDir:f.outputDir,captureResponse:true,onRequest:r=>preview=r});
+  assert.match(preview.responseBody,/"ok":true/);
+  const record=JSON.parse((await readFile(s.files.details,'utf8')).trim());
+  assert.equal(record.responseBody,undefined);
+});

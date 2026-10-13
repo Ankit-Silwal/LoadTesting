@@ -1,3 +1,5 @@
+import { setMaxListeners } from 'node:events';
+import { isDeepStrictEqual } from 'node:util';
 import { mkdir, open, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -15,6 +17,10 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
   const summaryPath = path.join(directory, 'summary.json');
   const details = await open(detailsPath, 'wx', 0o600);
   const controller = new AbortController();
+  setMaxListeners(0, controller.signal);
+  const budgetController = new AbortController();
+  const waitSignal = AbortSignal.any([controller.signal, budgetController.signal]);
+  setMaxListeners(0, waitSignal);
   const abort = () => controller.abort();
   if (signal?.aborted) abort();
   signal?.addEventListener('abort', abort, { once: true });
@@ -35,7 +41,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
   interval?.unref();
   async function pause(ms) {
     if (ms <= 0) return;
-    try { await delay(ms, undefined, { signal: controller.signal }); } catch (e) { if (!controller.signal.aborted) throw e; }
+    try { await delay(ms, undefined, { signal: waitSignal }); } catch (e) { if (!waitSignal.aborted) throw e; }
   }
   async function request(endpoint, index, worker, number) {
     const begun = performance.now();
@@ -82,7 +88,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
             const parsed = JSON.parse(text);
             for (const [key, expected] of Object.entries(endpoint.assertions.json)) {
               const actual = key.split('.').reduce((v,k) => v?.[k], parsed);
-              if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`JSON assertion failed at ${key}`);
+              if (!isDeepStrictEqual(actual, expected)) throw new Error(`JSON assertion failed at ${key}`);
             }
           } catch (e) { result.success = false; result.errorType = 'assertion'; result.error = e.message; }
         }
@@ -93,6 +99,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
       result.error = result.errorType === 'timeout' ? `Request exceeded ${endpoint.timeout} ms` : result.errorType === 'cancelled' ? 'Run cancelled' : 'Network request failed';
     } finally { active--; result.latencyMs = Math.round((performance.now() - begun) * 1000) / 1000; }
     overall.add(result); metrics[index].add(result);
+    if (config.requests !== null && overall.total >= config.requests) budgetController.abort();
     writeQueue = writeQueue.then(() => details.writeFile(JSON.stringify(result) + '\n')).catch(error => {
       fatalError = error; controller.abort(); throw error;
     });
@@ -103,22 +110,22 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
     await pause(Math.min(config.rampUp * 1000 * index / config.users, Math.max(0, deadline - performance.now())));
     while (!controller.signal.aborted && performance.now() < deadline) {
       if (config.requests !== null && nextRequest >= config.requests) return;
+      let number;
       if (config.maxRps) {
         const slot = Math.max(nextSlot, performance.now());
         nextSlot = slot + 1000 / config.maxRps;
         if (slot >= deadline) return;
+        number = nextRequest++;
         await pause(Math.min(slot - performance.now(), Math.max(0, deadline - performance.now())));
         if (controller.signal.aborted || performance.now() >= deadline) return;
-      }
-      if (config.requests !== null && nextRequest >= config.requests) return;
-      const number = nextRequest++;
+      } else number = nextRequest++;
       const endpointIndex = number % config.endpoints.length;
       await request(config.endpoints[endpointIndex], endpointIndex, index, number);
       if (config.thinkTime) await pause(Math.min(config.thinkTime, Math.max(0, deadline - performance.now())));
     }
   }
   let errors;
-  try { errors = await Promise.allSettled(Array.from({ length: config.users }, (_,i) => worker(i))); }
+  try { errors = await Promise.allSettled(Array.from({ length: Math.min(config.users, config.requests ?? config.users) }, (_,i) => worker(i))); }
   finally {
     if (interval) clearInterval(interval);
     signal?.removeEventListener('abort', abort);
