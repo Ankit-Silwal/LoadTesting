@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Open the printed address, normally **http://127.0.0.1:4310**. The default collection targets built-in demo endpoints, so you can click **Run load test** immediately. Replace them with your own URLs, edit requests, and configure concurrency on the right. **Send** runs one attempt against the selected endpoint. Runs execute in Node on your machine, so browser CORS restrictions do not apply to target APIs.
+Open the printed address, normally **http://127.0.0.1:4310**. The default collection targets built-in demo endpoints, so you can click **Run load test** immediately. Replace them with your own URLs, edit requests, and configure concurrency on the right. **Send** runs one attempt against the selected endpoint and shows its response body (up to 16 KiB) and redacted response headers. The preview is held in browser/server session memory and excluded from disk logs. Runs execute in Node on your machine, so browser CORS restrictions do not apply to target APIs.
 
 The workspace has no remote backend or account. It binds to `127.0.0.1`, uses a browser session cookie and same-origin checks, and writes logs beneath the directory where you started it. Request configs stay in the page until you export them. Recent history keeps the latest 20 runs for the lifetime of the server; disk logs remain after restarting.
 
@@ -234,7 +234,7 @@ npm run build
 npm run pack
 ```
 
-CI verifies Node 22/24 on Windows and Linux. To test the actual tarball before publication, install the resulting `.tgz` in a temporary directory and run its `loadtesting --help` and `loadtesting web` commands.
+CI verifies Node 22/24 on Windows and Linux, tests the tarball in an isolated install, and checks the browser workflow in Chromium. Run npm run smoke:package and npm run test:e2e locally too. Install Chromium with npx playwright install chromium, or set PLAYWRIGHT_CHANNEL to chrome to use installed Chrome. To test the actual tarball before publication, install the resulting `.tgz` in a temporary directory and run its `loadtesting --help` and `loadtesting web` commands.
 
 The published module also exposes the engine:
 

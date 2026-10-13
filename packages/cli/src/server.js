@@ -49,7 +49,7 @@ export async function startServer({ port = 4310, outputDir = 'loadtesting-logs' 
           current = run; runs.set(run.id, run);
           while (runs.size > 20) runs.delete(runs.keys().next().value);
           run.promise = runLoadTest(config, {
-            outputDir, signal: run.controller.signal,
+            outputDir, signal: run.controller.signal, captureResponse: config.preview === true,
             onProgress: s => { run.stats = s; },
             onRequest: r => { run.recent.push(r); if (run.recent.length > 200) run.recent.shift(); },
           }).then(summary => { run.stats = summary; run.status = summary.cancelled ? 'cancelled' : 'completed'; })

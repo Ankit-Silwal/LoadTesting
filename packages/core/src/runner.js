@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { normalizeConfig } from './config.js';
 import { Metrics, redactHeaders, redactUrl } from './stats.js';
 
-export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signal, onProgress, onRequest } = {}) {
+export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signal, onProgress, onRequest, captureResponse = false } = {}) {
   const config = normalizeConfig(input);
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0,8)}`;
   const directory = path.resolve(outputDir, runId);
@@ -51,6 +51,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
       requestHeaders: redactHeaders(endpoint.headers), status: null, success: false, bytes: 0, latencyMs: 0 };
     active++; peakConcurrency = Math.max(peakConcurrency, active);
     const timeout = AbortSignal.timeout(endpoint.timeout);
+    let responseBody, responseTruncated;
     try {
       const response = await fetch(endpoint.url, { method: endpoint.method, headers, body,
         redirect: endpoint.redirect, signal: AbortSignal.any([controller.signal, timeout]) });
@@ -58,7 +59,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
       result.responseHeaders = redactHeaders(Object.fromEntries(response.headers));
       // Always consume the full response for end-to-end latency and connection reuse.
       // Keep a bounded prefix only when assertions need it.
-      const needsText = endpoint.assertions.contains !== undefined || endpoint.assertions.json !== undefined;
+      const needsText = captureResponse || endpoint.assertions.contains !== undefined || endpoint.assertions.json !== undefined;
       let chunks = [], sampleBytes = 0;
       if (response.body) for await (const chunk of response.body) {
         result.bytes += chunk.length;
@@ -71,6 +72,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
       if (!result.success) { result.errorType = 'http'; result.error = `Unexpected HTTP status ${response.status}`; }
       if (needsText) {
         const text = Buffer.concat(chunks).toString('utf8');
+        if (captureResponse) { responseBody = Buffer.concat(chunks).subarray(0,16384).toString('utf8'); responseTruncated = result.bytes > 16384; }
         if (endpoint.assertions.contains !== undefined && !text.includes(endpoint.assertions.contains)) {
           result.success = false; result.errorType = 'assertion'; result.error = 'Response does not contain expected text';
         }
@@ -95,7 +97,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
       fatalError = error; controller.abort(); throw error;
     });
     await writeQueue;
-    onRequest?.(result);
+    onRequest?.(captureResponse ? { ...result, responseBody, responseTruncated } : result);
   }
   async function worker(index) {
     await pause(Math.min(config.rampUp * 1000 * index / config.users, Math.max(0, deadline - performance.now())));
@@ -104,6 +106,7 @@ export async function runLoadTest(input, { outputDir = 'loadtesting-logs', signa
       if (config.maxRps) {
         const slot = Math.max(nextSlot, performance.now());
         nextSlot = slot + 1000 / config.maxRps;
+        if (slot >= deadline) return;
         await pause(Math.min(slot - performance.now(), Math.max(0, deadline - performance.now())));
         if (controller.signal.aborted || performance.now() >= deadline) return;
       }

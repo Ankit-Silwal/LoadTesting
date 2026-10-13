@@ -111,6 +111,7 @@ function setRunning(value) {
   running = value; $('run').hidden = value; $('stop').hidden = !value; $('preview').disabled = value;
 }
 function resetView() {
+  $('response-preview').hidden = true;
   chart = []; lastElapsed = -1;
   for (const id of ['total','success','rps','p95']) $('metric-' + id).textContent = '—';
   $('metric-elapsed').textContent = 'Waiting for your first run'; $('metric-error').textContent = 'Errors appear here';
@@ -123,7 +124,8 @@ function resetView() {
 }
 function renderLatency(latency = {}) {
   const max = latency.max || 1;
-  $('latency-bars').innerHTML = ['p50','p90','p95','p99','max'].map(key => `<div class="latency-row"><span>${key.toUpperCase()}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.max(0, (latency[key] ?? 0) / max * 100))}%"></div></div><strong>${latency[key] === undefined ? '—' : fmt(latency[key])}</strong></div>`).join('');
+  $('latency-bars').innerHTML = ['p50','p90','p95','p99','max'].map(key => `<div class="latency-row"><span>${key.toUpperCase()}</span><div class="bar-track"><div class="bar-fill" data-width="${Math.min(100, Math.max(0, (latency[key] ?? 0) / max * 100))}"></div></div><strong>${latency[key] === undefined ? '—' : fmt(latency[key])}</strong></div>`).join('');
+  $('latency-bars').querySelectorAll('[data-width]').forEach(b => { b.style.width = b.dataset.width + '%'; });
 }
 function renderChart() {
   if (!chart.length) return;
@@ -146,6 +148,13 @@ function showRun(run) {
   $('endpoint-results').innerHTML = s.endpoints.map(e => `<tr><td><span class="method-inline">${esc(e.method)}</span>${esc(e.name)}</td><td>${fmt(e.total)}</td><td class="green">${fmt(e.successful)}</td><td class="${e.failed ? 'bad-result' : ''}">${fmt(e.failed)}</td><td>${fmt(e.requestsPerSecond)}</td><td>${fmt(e.latency.p50)} ms</td><td>${fmt(e.latency.p95)} ms</td><td>${fmt(e.latency.p99)} ms</td></tr>`).join('');
   $('recent-requests').innerHTML = (run.recent ?? []).slice().reverse().map(r => `<tr><td>${r.sequence}</td><td>${esc(r.endpointId)}</td><td>${r.status ?? '—'}</td><td>${fmt(r.latencyMs)} ms</td><td class="${r.success ? 'green' : 'bad-result'}" title="${esc(r.error)}">${r.success ? 'Success' : esc(r.errorType)}</td></tr>`).join('');
   renderLatency(s.latency);
+  const preview = (run.recent ?? []).find(r => r.responseBody !== undefined);
+  if (preview) {
+    $('response-preview').hidden = false;
+    $('response-status').textContent = preview.status + ' · ' + fmt(preview.latencyMs) + ' ms' + (preview.responseTruncated ? ' · truncated at 16 KiB' : '');
+    try { $('response-body').textContent = JSON.stringify(JSON.parse(preview.responseBody), null, 2); } catch { $('response-body').textContent = preview.responseBody; }
+    $('response-headers').textContent = JSON.stringify(preview.responseHeaders, null, 2);
+  }
   if (s.elapsedSeconds !== lastElapsed) { chart.push({ x: s.elapsedSeconds, y: s.latency.p95 }); if (chart.length > 240) chart.shift(); lastElapsed = s.elapsedSeconds; renderChart(); }
   if (s.files) {
     $('download-details').hidden = false; $('download-summary').hidden = false;
@@ -173,7 +182,7 @@ async function start(preview = false) {
   if (running) return;
   syncTab(); syncSettings();
   const input = structuredClone(config);
-  if (preview) { input.name = 'Single request · ' + endpoint().name; input.endpoints = [structuredClone(endpoint())]; input.users = 1; input.requests = 1; delete input.duration; input.rampUp = 0; input.thinkTime = 0; input.maxRps = 0; input.thresholds = {}; }
+  if (preview) { input.preview = true; input.name = 'Single request · ' + endpoint().name; input.endpoints = [structuredClone(endpoint())]; input.users = 1; input.requests = 1; delete input.duration; input.rampUp = 0; input.thinkTime = 0; input.maxRps = 0; input.thresholds = {}; }
   const run = await api('/api/runs', { method: 'POST', body: JSON.stringify(input) });
   currentRun = run.id; resetView(); setRunning(true); $('notice').hidden = true; poll(run.id);
 }

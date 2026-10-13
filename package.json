@@ -1,18 +1,28 @@
 {
-  "name": "loadtesting-monorepo",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
-  "engines": { "node": ">=22" },
-  "scripts": {
-    "dev": "node packages/cli/src/index.js web",
-    "loadtest": "node packages/cli/src/index.js",
-    "build": "node scripts/build.mjs",
-    "test": "node --test tests/*.test.mjs",
-    "check": "node scripts/check.mjs",
-    "pack": "npm run build && npm pack --workspace @ankit-silwal/loadtesting",
-    "demo": "node examples/demo-server.mjs"
-  },
-  "license": "AGPL-3.0-only"
+    "name":  "loadtesting-monorepo",
+    "version":  "0.1.0",
+    "private":  true,
+    "type":  "module",
+    "workspaces":  [
+                       "packages/*",
+                       "apps/*"
+                   ],
+    "engines":  {
+                    "node":  "\u003e=22"
+                },
+    "scripts":  {
+                    "dev":  "node packages/cli/src/index.js web",
+                    "loadtest":  "node packages/cli/src/index.js",
+                    "build":  "node scripts/build.mjs",
+                    "test":  "node --test tests/*.test.mjs",
+                    "check":  "node scripts/check.mjs",
+                    "pack":  "npm run build \u0026\u0026 npm pack --workspace @ankit-silwal/loadtesting",
+                    "demo":  "node examples/demo-server.mjs",
+                    "test:e2e":  "playwright test",
+                    "smoke:package":  "node scripts/package-smoke.mjs"
+                },
+    "license":  "AGPL-3.0-only",
+    "devDependencies":  {
+                            "@playwright/test":  "1.64.0"
+                        }
 }

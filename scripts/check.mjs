@@ -10,5 +10,5 @@ async function check(dir) {
     }
   }
 }
-for (const dir of ['packages/core/src', 'packages/cli/src', 'apps/web/src', 'scripts', 'tests', 'examples']) await check(dir);
+for (const dir of ['packages/core/src', 'packages/cli/src', 'apps/web/src', 'scripts', 'tests', 'examples', 'e2e']) await check(dir);
 console.log('JavaScript syntax checks passed.');

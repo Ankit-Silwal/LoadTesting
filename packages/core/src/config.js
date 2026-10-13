@@ -1,13 +1,15 @@
 ﻿import { readFile } from 'node:fs/promises';
 
 const methods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
-export function interpolate(value, variables = {}) {
+export function interpolate(value, variables = {}, stack = []) {
   if (typeof value === 'string') return value.replace(/\{\{([^{}]+)\}\}/g, (_, key) => {
     if (variables[key.trim()] === undefined) throw new Error(`Missing variable: ${key.trim()}`);
-    return String(variables[key.trim()]);
+    const name = key.trim();
+    if (stack.includes(name) || stack.length > 32) throw new Error('Circular variable: ' + name);
+    return interpolate(String(variables[name]), variables, [...stack, name]);
   });
-  if (Array.isArray(value)) return value.map(v => interpolate(v, variables));
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, interpolate(v, variables)]));
+  if (Array.isArray(value)) return value.map(v => interpolate(v, variables, stack));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, interpolate(v, variables, stack)]));
   return value;
 }
 function integer(value, fallback, min, max, label) {
@@ -38,14 +40,17 @@ export function normalizeConfig(input, environment = process.env) {
   if (!Number.isFinite(rampUp) || rampUp < 0 || rampUp > 86400) throw new Error('rampUp must be seconds from 0 to 86400');
   if (!Number.isFinite(maxRps) || maxRps < 0 || maxRps > 100000) throw new Error('maxRps must be from 0 to 100000');
   const thresholds = config.thresholds ?? {};
+  if (typeof thresholds !== 'object' || Array.isArray(thresholds)) throw new Error('thresholds must be an object');
   for (const [key, value] of Object.entries(thresholds)) {
     if (!['p95', 'errorRate'].includes(key) || !Number.isFinite(value) || value < 0 || (key === 'errorRate' && value > 100)) throw new Error('Thresholds support p95 (ms) and errorRate (0–100 percent)');
   }
   const ids = new Set();
   const endpoints = config.endpoints.map((e, i) => {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) throw new Error('Each endpoint must be an object');
     const id = String(e.id ?? `endpoint-${i+1}`);
     if (ids.has(id)) throw new Error(`Duplicate endpoint id: ${id}`);
     ids.add(id);
+    if (!e || typeof e !== 'object' || Array.isArray(e)) throw new Error('Each endpoint must be an object');
     let url;
     try { url = new URL(e.url); } catch { throw new Error(`Endpoint ${i+1}: provide a full HTTP URL`); }
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only HTTP and HTTPS endpoints are supported');
@@ -53,8 +58,9 @@ export function normalizeConfig(input, environment = process.env) {
     for (const [key, value] of Object.entries(pairs(e.query, 'query'))) url.searchParams.set(key, value);
     const method = String(e.method ?? 'GET').toUpperCase();
     if (!methods.has(method)) throw new Error(`Unsupported method: ${method}`);
-    const headers = pairs(e.headers, 'headers');
+    const headers = Object.fromEntries(Object.entries(pairs(e.headers, 'headers')).map(([k,v]) => [k.toLowerCase(),v]));
     const auth = e.auth ?? { type: 'none' };
+    if (!auth || typeof auth !== 'object' || Array.isArray(auth)) throw new Error('auth must be an object');
     if (auth.type === 'bearer') headers.authorization = `Bearer ${auth.token ?? ''}`;
     else if (auth.type === 'basic') headers.authorization = `Basic ${Buffer.from(`${auth.username ?? ''}:${auth.password ?? ''}`).toString('base64')}`;
     else if (auth.type === 'apiKey') {
@@ -85,6 +91,7 @@ export function normalizeConfig(input, environment = process.env) {
     const expectedStatus = e.expectedStatus ?? [];
     if (!Array.isArray(expectedStatus) || expectedStatus.some(n => !Number.isInteger(n) || n < 100 || n > 599)) throw new Error('expectedStatus must be an array of HTTP status codes');
     const assertions = e.assertions ?? {};
+    if (typeof assertions !== 'object' || Array.isArray(assertions)) throw new Error('assertions must be an object');
     if (assertions.contains !== undefined && typeof assertions.contains !== 'string') throw new Error('assertions.contains must be a string');
     if (assertions.json !== undefined) pairs(assertions.json, 'assertions.json');
     if (e.redirect !== undefined && !['follow', 'manual', 'error'].includes(e.redirect)) throw new Error('redirect must be follow, manual, or error');

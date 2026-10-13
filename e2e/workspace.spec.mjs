@@ -1,0 +1,66 @@
+import { test,expect } from '@playwright/test';
+test.beforeEach(async({page})=>{await page.goto('/');});
+test('multi-endpoint run updates live metrics, downloads summary and request log',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.locator('#mode').selectOption('requests');
+  await page.locator('#budget').fill('12');await page.locator('#users').fill('3');
+  await page.getByRole('button',{name:'Run load test'}).click();
+  await expect(page.locator('#run-state')).toHaveText('Completed');
+  await expect(page.locator('#metric-total')).toHaveText('12');
+  await expect(page.locator('#metric-success')).toHaveText('12');
+  await expect(page.locator('#endpoint-results tr')).toHaveCount(3);
+  await expect(page.locator('#endpoint-results tr').first()).toContainText('4');
+  const download=page.waitForEvent('download');await page.locator('#download-summary').click();
+  expect((await download).suggestedFilename()).toBe('summary.json');
+  const details=page.waitForEvent('download');await page.locator('#download-details').click();
+  expect((await details).suggestedFilename()).toBe('requests.ndjson');
+  await expect(page.locator('#recent-requests tr')).toHaveCount(12);
+  expect(errors).toEqual([]);
+  await page.screenshot({path:'test-results/workspace-desktop.png',fullPage:true});
+});
+test('request tabs, body, variables, auth, assertions and single-response preview',async({page})=>{
+  await page.getByRole('button',{name:'POST Create request'}).click();
+  await page.getByRole('tab',{name:'Body',exact:true}).click();
+  await page.locator('#body-value').fill('{"message":"updated"}');
+  await page.getByRole('tab',{name:'Variables',exact:true}).click();
+  await page.locator('#variables').fill('{"token":"preview-secret"}');
+  await page.getByRole('tab',{name:'Auth',exact:true}).click();
+  await page.locator('#auth-type').selectOption('bearer');await page.locator('#auth-token').fill('{{token}}');
+  await page.getByRole('tab',{name:'Assertions',exact:true}).click();
+  await page.locator('#json-assertions').fill('{"ok":true}');
+  await page.getByRole('button',{name:'Send ↗'}).click();
+  await expect(page.locator('#run-state')).toHaveText('Completed');
+  await expect(page.locator('#metric-total')).toHaveText('1');
+  await expect(page.locator('#response-preview')).toBeVisible();
+  await expect(page.locator('#response-body')).toContainText('"ok": true');
+  await expect(page.locator('#response-status')).toContainText('200');
+});
+test('invalid input is actionable and cancellation finishes with downloadable logs',async({page})=>{
+  await page.locator('#users').fill('0');await page.getByRole('button',{name:'Run load test'}).click();
+  await expect(page.locator('#notice')).toContainText('users must');
+  await page.locator('#users').fill('2');await page.locator('#budget').fill('20');
+  await page.getByRole('button',{name:'Run load test'}).click();
+  await expect(page.locator('#stop')).toBeVisible();
+  await page.locator('#stop').click();await expect(page.locator('#run-state')).toHaveText('Cancelled');
+  await expect(page.locator('#download-summary')).toBeVisible();
+});
+test('config export and import preserve a reusable request collection',async({page})=>{
+  await page.locator('#add-request').click();
+  await page.locator('#request-name').fill('Imported custom request');
+  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Export configuration'}).click();
+  const downloaded=await downloadPromise;expect(downloaded.suggestedFilename()).toBe('loadtest.json');
+  const file=await downloaded.path();await page.locator('#import-file').setInputFiles(file);
+  await expect(page.locator('#notice')).toContainText('Imported 4 endpoints');
+  await expect(page.locator('#endpoint-list button')).toHaveCount(4);
+  await page.getByRole('button',{name:'GET Imported custom request'}).click();
+  await expect(page.locator('#request-name')).toHaveValue('Imported custom request');
+});
+test('mobile collection navigation and dashboard do not overflow the viewport',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByRole('button',{name:'GET Slow response'})).toBeVisible();
+  await page.getByRole('button',{name:'GET Slow response'}).click();
+  await expect(page.locator('#request-name')).toHaveValue('Slow response');
+  const size=await page.evaluate(()=>({body:document.documentElement.scrollWidth,viewport:innerWidth}));
+  expect(size.body).toBeLessThanOrEqual(size.viewport);
+  await page.screenshot({path:'test-results/workspace-mobile.png',fullPage:true});
+});
